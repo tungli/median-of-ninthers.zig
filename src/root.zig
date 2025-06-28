@@ -194,23 +194,57 @@ pub fn QuickSelect(comptime T: type) type {
             }
         }
 
+        fn medianIndex(self: @This(), a: usize, b: usize, c: usize) usize
+        {
+            const x = self.items;
+
+            if (x[a] > x[c]) {
+                if (x[b] > x[a]) {
+                    return a;
+                }
+                if (x[b] < x[c]) {
+                    return c;
+                }
+            } else {
+                if (x[b] > x[c]) {
+                    return c;
+                }
+                if (x[b] < x[a]) {
+                    return a;
+                }
+            }
+            return b;
+        }
+
         fn ninther(
             self: @This(),
-            a: usize,
-            b: usize,
-            c: usize,
-            d: usize,
-            e: usize,
-            f: usize,
-            g: usize,
-            h: usize,
-            i: usize,
+            inds: *[9]usize
         ) void {
-            // TODO this should be different
-            self.median3(a, b, c);
-            self.median3(d, e, f);
-            self.median3(g, h, i);
-            self.median3(b, e, h);
+            const x = self.items;
+            const a = @This() { .items = inds }; // just for swaps
+            inds[1] = self.medianIndex(inds[0], inds[1], inds[2]);
+            inds[7] = self.medianIndex(inds[6], inds[7], inds[8]);
+            if (x[inds[1]] > x[inds[7]]) a.swap(1, 7);
+            if (x[inds[3]] > x[inds[6]]) a.swap(3, 5);
+            if ((x[inds[4]] < x[inds[3]]) and (x[inds[4]] > x[inds[5]])) {
+                inds[3] = inds[5];
+            } else {
+                if (x[inds[4]] < x[inds[1]]) {
+                    self.swap(inds[4], inds[1]);
+                    return;
+                }
+                if (x[inds[4]] > x[inds[7]]) {
+                    self.swap(inds[4], inds[7]);
+                    return;
+                }
+                return;
+            }
+            if (x[inds[3]] < x[inds[1]]) {
+                inds[3] = inds[1];
+            } else if (x[inds[3]] > x[inds[7]]) {
+                inds[3] = inds[7];
+            }
+            self.swap(inds[4], inds[3]);
         }
 
         pub fn medianOfNinthers(self: @This()) usize {
@@ -228,7 +262,8 @@ pub fn QuickSelect(comptime T: type) type {
             var a = low - 4 * phi - gap;
             var b = high + gap;
             for (low..high) |i| {
-                self.ninther(a, i - phi, b, a + 1, i, b + 1, a + 2, i + phi, b + 2);
+                var inds = [9]usize {a, i - phi, b, a + 1, i, b + 1, a + 2, i + phi, b + 2};
+                self.ninther(&inds);
                 a += 3;
                 b += 3;
             }
