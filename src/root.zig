@@ -1,14 +1,25 @@
-/// This version is written based on the original work:
-///    https://github.com/andralex/MedianOfNinthers
-/// and associated paper:
-///    "Fast Deterministic Selection" by Andrei Alexandrescu
-/// with license:
-/// ------------------------------------------------------------
-///          Copyright Andrei Alexandrescu, 2016-.
-/// Distributed under the Boost Software License, Version 1.0.
-///    (See accompanying file LICENSE_1_0.txt or copy at
-///          https://boost.org/LICENSE_1_0.txt)
-/// ------------------------------------------------------------
+//! This version is written based on the original work:
+//!    [MedianOfNithers](https://github.com/andralex/MedianOfNinthers)
+//! and associated paper:
+//!    ["Fast Deterministic Selection" by Andrei Alexandrescu](https://erdani.org/research/sea2017.pdf)
+//! with license:
+//! ```
+//! ------------------------------------------------------------
+//!          Copyright Andrei Alexandrescu, 2016-.
+//! Distributed under the Boost Software License, Version 1.0.
+//!    (See accompanying file LICENSE_1_0.txt or copy at
+//!          https://boost.org/LICENSE_1_0.txt)
+//! ------------------------------------------------------------
+//! ```
+//! 
+//! Example usage:
+//! ```
+//! var data = [_]usize{ 1, 11, 5, 10, 6, 7, 4, 2, 3, 2, 5, 4, 9 };
+//! const x = Partition(usize){ .items = &data };
+//! const k = data.len / 2;
+//! x.kElement(k);
+//! const median = x[k]; // 5
+//! ```
 
 
 const std = @import("std");
@@ -260,7 +271,7 @@ pub fn Partition(comptime T: type) type {
             self.swap(inds[4], inds[3]);
         }
 
-        pub fn medianOfNinthers(self: @This()) usize {
+        fn medianOfNinthers(self: @This()) usize {
             const len = self.items.len;
             // std.debug.assert(len > 11);
 
