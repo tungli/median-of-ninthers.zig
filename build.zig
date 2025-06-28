@@ -6,7 +6,7 @@ pub fn build(b: *std.Build) void {
 
     const source_file = b.path("src/root.zig");
 
-    _ = b.addModule("andrei_median", .{
+    _ = b.addModule("median-of-ninthers", .{
         .root_source_file = source_file,
         .optimize = optimize,
         .target = target,

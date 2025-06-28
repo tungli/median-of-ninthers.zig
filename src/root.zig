@@ -1,6 +1,19 @@
+/// This version is written based on the original work:
+///    https://github.com/andralex/MedianOfNinthers
+/// and associated paper:
+///    "Fast Deterministic Selection" by Andrei Alexandrescu
+/// with license:
+/// ------------------------------------------------------------
+///          Copyright Andrei Alexandrescu, 2016-.
+/// Distributed under the Boost Software License, Version 1.0.
+///    (See accompanying file LICENSE_1_0.txt or copy at
+///          https://boost.org/LICENSE_1_0.txt)
+/// ------------------------------------------------------------
+
+
 const std = @import("std");
 
-pub fn QuickSelect(comptime T: type) type {
+pub fn Partition(comptime T: type) type {
     return struct {
         items: []T,
 
@@ -65,8 +78,8 @@ pub fn QuickSelect(comptime T: type) type {
                 i += 5;
                 j += 1;
             }
-            const q = @This(){ .items = self.items[0..j] };
-            q.kthElement(.bfprt_baseline, j / 2);
+            const x = @This(){ .items = self.items[0..j] };
+            x.kElementMethod(.bfprt_baseline, j / 2);
             return self.hoarePartition(j / 2);
         }
 
@@ -107,8 +120,8 @@ pub fn QuickSelect(comptime T: type) type {
                 i += 3;
                 m += 1;
             }
-            const q = @This(){ .items = self.items[0..m] };
-            q.kthElement(.repeated_step, m / 2);
+            const x = @This(){ .items = self.items[0..m] };
+            x.kElementMethod(.repeated_step, m / 2);
             return self.hoarePartition(m / 2);
         }
 
@@ -270,15 +283,15 @@ pub fn QuickSelect(comptime T: type) type {
 
             const x = @This() { .items = self.items[low..len] };
             if (x.items.len > 11) {
-                x.kthElement(.median_of_ninthers, p);
+                x.kElementMethod(.median_of_ninthers, p);
                 return self.expandPartition(low, low + p, high);
             } else {
-                x.kthElement(.repeated_step, p);
+                x.kElementMethod(.repeated_step, p);
                 return self.hoarePartition(p);
             }
         }
 
-        pub fn kthElement(
+        pub fn kElementMethod(
             self: @This(),
             comptime method: PartitionMethod,
             k: usize,
@@ -292,8 +305,113 @@ pub fn QuickSelect(comptime T: type) type {
             var cur = self.items;
             var i = k;
             while (true) {
-                const q = @This(){ .items = cur };
-                const p = partition(q);
+                const x = @This(){ .items = cur };
+                const p = partition(x);
+                if (p == i) return;
+                if (p > i) {
+                    cur = cur[0..p];
+                } else {
+                    i -= p + 1;
+                    cur = cur[(p + 1)..cur.len];
+                }
+            }
+        }
+
+        fn medianOfMinima(self: @This(), k: usize) usize {
+            const k2 = k * 2;
+            const min_over = self.items.len / k2;
+            var j = k2;
+            for (0..k2) |i| {
+                const limit = j + min_over;
+                var min_index = j;
+                while(true)
+                {
+                    j += 1;
+                    if (j < limit) break;
+                    if (self.items[j] < self.items[min_index]) {
+                        min_index = j;
+                    }
+                }
+                if (self.items[min_index] < self.items[i]) {
+                    self.swap(i, min_index);
+                }
+            }
+            const x = @This() { .items = self.items[0..k2] };
+            x.kthElement(k);
+            return self.expandPartition(0, k, k2);
+        }
+
+        fn medianOfMaxima(self: @This(), k: usize) usize {
+            const len = self.items.len;
+            const subset = (len - k) * 2;
+            const start = len - subset;
+            const max_over = start / subset;
+
+            var j = start - subset * max_over;
+            for (start..len) |i| {
+                const limit = j + max_over;
+                var max_index = j;
+                while( true) {
+                    j += 1;
+                    if (j < limit) break;
+                    if (self.items[j] > self.items[max_index]) {
+                        max_index = j;
+                    }
+                }
+                if (self.items[max_index] > self.items[i]) {
+                    self.swap(i, max_index);
+                }
+            }
+            const x = @This() { .items = self.items[start..len] };
+            x.kthElement(len - k);
+            return self.expandPartition(start, k, len);
+        }
+
+        /// Rearranges the `self.items` such that `self.items[k]` will be at
+        /// the same position were the slice sorted. Furthermore, all elements
+        /// `self.items[0..k]` are less or equal to `self.items[k]` and all
+        /// elements `self.items[k..self.items.len]` are greater or equal to
+        /// `self.items[k]`.
+        pub fn kthElement(self: @This(), k: usize) void {
+            var cur = self.items;
+            var i = k;
+            while(true) {
+                if (k == 0)
+                {
+                    var p = k;
+                    for ((k+1)..cur.len) |n| {
+                        if (cur[n] < cur[p]) {
+                            p = n;
+                        }
+                    }
+                    self.swap(0, p);
+                    return;
+                }
+                if (k + 1 == cur.len)
+                {
+                    var p: usize = 0;
+                    for (1..cur.len) |n| {
+                        if (cur[p] < cur[n]) {
+                            p = n;
+                        }
+                    }
+                    self.swap(cur.len - 1, p);
+                    return;
+                }
+
+                const x = @This() { .items = cur };
+                var p: usize = undefined;
+                if (cur.len < 17) {
+                    p = x.hoarePartition(i);
+                }
+                else if (i * 6 <= cur.len) {
+                    p = x.medianOfMinima(i);
+                } else if (i * 6 >= cur.len * 5) {
+                    p = x.medianOfMaxima(i);
+                } else {
+                    p = x.medianOfNinthers();
+                }
+
                 if (p == i) return;
                 if (p > i) {
                     cur = cur[0..p];
@@ -310,30 +428,30 @@ test "baseline" {
     // 1, 2, 2, 3, 4, 4, 5, 5, 6, 7, 9, 10, 11
     var data = [_]usize{ 1, 11, 5, 10, 6, 7, 4, 2, 3, 2, 5, 4, 9 };
 
-    const q = QuickSelect(usize){ .items = &data };
+    const x = Partition(usize){ .items = &data };
 
     var k = data.len / 2;
-    q.kthElement(.bfprt_baseline, k);
+    x.kElementMethod(.bfprt_baseline, k);
     try std.testing.expect(data[k] == 5);
 
     k = 0;
-    q.kthElement(.bfprt_baseline, k);
+    x.kElementMethod(.bfprt_baseline, k);
     try std.testing.expect(data[k] == 1);
 
     k = 1;
-    q.kthElement(.bfprt_baseline, k);
+    x.kElementMethod(.bfprt_baseline, k);
     try std.testing.expect(data[k] == 2);
 
     k = 2;
-    q.kthElement(.bfprt_baseline, k);
+    x.kElementMethod(.bfprt_baseline, k);
     try std.testing.expect(data[k] == 2);
 
     k = 3;
-    q.kthElement(.bfprt_baseline, k);
+    x.kElementMethod(.bfprt_baseline, k);
     try std.testing.expect(data[k] == 3);
 
     k = data.len - 2;
-    q.kthElement(.bfprt_baseline, k);
+    x.kElementMethod(.bfprt_baseline, k);
     try std.testing.expect(data[k] == 10);
 }
 
@@ -341,30 +459,30 @@ test "repeated step" {
     // 1, 2, 2, 3, 4, 4, 5, 5, 6, 7, 9, 10, 11
     var data = [_]usize{ 1, 11, 5, 10, 6, 7, 4, 2, 3, 2, 5, 4, 9 };
 
-    const q = QuickSelect(usize){ .items = &data };
+    const x = Partition(usize){ .items = &data };
 
     var k = data.len / 2;
-    q.kthElement(.repeated_step, k);
+    x.kElementMethod(.repeated_step, k);
     try std.testing.expect(data[k] == 5);
 
     k = 0;
-    q.kthElement(.repeated_step, k);
+    x.kElementMethod(.repeated_step, k);
     try std.testing.expect(data[k] == 1);
 
     k = 1;
-    q.kthElement(.repeated_step, k);
+    x.kElementMethod(.repeated_step, k);
     try std.testing.expect(data[k] == 2);
 
     k = 2;
-    q.kthElement(.repeated_step, k);
+    x.kElementMethod(.repeated_step, k);
     try std.testing.expect(data[k] == 2);
 
     k = 3;
-    q.kthElement(.repeated_step, k);
+    x.kElementMethod(.repeated_step, k);
     try std.testing.expect(data[k] == 3);
 
     k = data.len - 2;
-    q.kthElement(.repeated_step, k);
+    x.kElementMethod(.repeated_step, k);
     try std.testing.expect(data[k] == 10);
 }
 
@@ -372,30 +490,30 @@ test "ninthers median" {
     // 1, 2, 2, 3, 4, 4, 5, 5, 6, 7, 9, 10, 11
     var data = [_]usize{ 1, 11, 5, 10, 6, 7, 4, 2, 3, 2, 5, 4, 9 };
 
-    const q = QuickSelect(usize){ .items = &data };
+    const x = Partition(usize){ .items = &data };
 
     var k = data.len / 2;
-    q.kthElement(.median_of_ninthers, k);
+    x.kElementMethod(.median_of_ninthers, k);
     try std.testing.expect(data[k] == 5);
 
     k = 0;
-    q.kthElement(.median_of_ninthers, k);
+    x.kElementMethod(.median_of_ninthers, k);
     try std.testing.expect(data[k] == 1);
 
     k = 1;
-    q.kthElement(.median_of_ninthers, k);
+    x.kElementMethod(.median_of_ninthers, k);
     try std.testing.expect(data[k] == 2);
 
     k = 2;
-    q.kthElement(.median_of_ninthers, k);
+    x.kElementMethod(.median_of_ninthers, k);
     try std.testing.expect(data[k] == 2);
 
     k = 3;
-    q.kthElement(.median_of_ninthers, k);
+    x.kElementMethod(.median_of_ninthers, k);
     try std.testing.expect(data[k] == 3);
 
     k = data.len - 2;
-    q.kthElement(.median_of_ninthers, k);
+    x.kElementMethod(.median_of_ninthers, k);
     try std.testing.expect(data[k] == 10);
 }
 
@@ -410,12 +528,34 @@ test "rng data" {
          y[i] = a;
     }
 
-    const q = QuickSelect(usize){ .items = y };
+    const x = Partition(usize){ .items = y };
     const k = y.len / 2;
-    q.kthElement(.median_of_ninthers, k);
-    std.debug.print("{}\n", .{y[k]});
+    x.kElementMethod(.median_of_ninthers, k);
     try std.testing.expect(y[k] == 515);
 }
 
+test "rng data2" {
+    const gpa = std.testing.allocator;
+    const n: usize = 10000;
+    const y = try gpa.alloc(usize, n);
+    defer gpa.free(y);
+    var a: usize = 131;
+    for (0..n) |i| {
+         a = (85151 * a + 191) % 1031;
+         y[i] = a;
+    }
 
+    const x = Partition(usize){ .items = y };
+    const k = y.len / 2;
+    x.kthElement(k);
+    try std.testing.expect(y[k] == 515);
 
+    const kth = y[k]; 
+    for (0..k) |i| {
+        try std.testing.expect(kth >= y[i]);
+    }
+
+    for (k..y.len) |i| {
+        try std.testing.expect(kth <= y[i]);
+    }
+}
