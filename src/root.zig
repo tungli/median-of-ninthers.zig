@@ -245,7 +245,7 @@ pub fn Partition(comptime T: type) type {
             inds: *[9]usize
         ) void {
             const x = self.items;
-            const a = @This() { .items = inds }; // just for swaps
+            const a = Partition(usize) { .items = inds }; // just for swaps
             inds[1] = self.medianIndex(inds[0], inds[1], inds[2]);
             inds[7] = self.medianIndex(inds[6], inds[7], inds[8]);
             if (x[inds[1]] > x[inds[7]]) a.swap(1, 7);
@@ -434,6 +434,8 @@ pub fn Partition(comptime T: type) type {
         }
     };
 }
+
+
 
 test "baseline" {
     // 1, 2, 2, 3, 4, 4, 5, 5, 6, 7, 9, 10, 11
