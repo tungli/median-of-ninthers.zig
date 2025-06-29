@@ -90,7 +90,7 @@ pub fn Partition(comptime T: type) type {
                 j += 1;
             }
             const x = @This(){ .items = self.items[0..j] };
-            x.kElementMethod(.bfprt_baseline, j / 2);
+            x.kthElementMethod(.bfprt_baseline, j / 2);
             return self.hoarePartition(j / 2);
         }
 
@@ -132,7 +132,7 @@ pub fn Partition(comptime T: type) type {
                 m += 1;
             }
             const x = @This(){ .items = self.items[0..m] };
-            x.kElementMethod(.repeated_step, m / 2);
+            x.kthElementMethod(.repeated_step, m / 2);
             return self.hoarePartition(m / 2);
         }
 
@@ -293,16 +293,42 @@ pub fn Partition(comptime T: type) type {
             }
 
             const x = @This() { .items = self.items[low..len] };
+            x.kthElement(p);
+            return self.expandPartition(low, low + p, high);
+        }
+
+        fn medianOfNinthersMethod(self: @This()) usize {
+            const len = self.items.len;
+            // std.debug.assert(len > 11);
+
+            const phi = if (len <= 1024) len / 12 else
+                if(len <= 128 * 1024) len / 64 else len / 1024;
+
+            const p = phi / 2;
+            const low = len / 2 - p;
+            const high = low + phi;
+
+            const gap = (len - 9 * phi) / 4;
+            var a = low - 4 * phi - gap;
+            var b = high + gap;
+            for (low..high) |i| {
+                var inds = [9]usize {a, i - phi, b, a + 1, i, b + 1, a + 2, i + phi, b + 2};
+                self.ninther(&inds);
+                a += 3;
+                b += 3;
+            }
+
+            const x = @This() { .items = self.items[low..len] };
             if (x.items.len > 11) {
-                x.kElementMethod(.median_of_ninthers, p);
+                x.kthElementMethod(.median_of_ninthers, p);
                 return self.expandPartition(low, low + p, high);
             } else {
-                x.kElementMethod(.repeated_step, p);
+                x.kthElementMethod(.repeated_step, p);
                 return self.hoarePartition(p);
             }
         }
 
-        pub fn kElementMethod(
+        pub fn kthElementMethod(
             self: @This(),
             comptime method: PartitionMethod,
             k: usize,
@@ -310,7 +336,7 @@ pub fn Partition(comptime T: type) type {
             const partition = switch (method) {
                 .bfprt_baseline => BFPRTBaseline,
                 .repeated_step => repeatedStep,
-                .median_of_ninthers => medianOfNinthers,
+                .median_of_ninthers => medianOfNinthersMethod,
             };
 
             var cur = self.items;
@@ -387,10 +413,10 @@ pub fn Partition(comptime T: type) type {
             var cur = self.items;
             var i = k;
             while(true) {
-                if (k == 0)
+                if (i == 0)
                 {
-                    var p = k;
-                    for ((k+1)..cur.len) |n| {
+                    var p = i;
+                    for ((i+1)..cur.len) |n| {
                         if (cur[n] < cur[p]) {
                             p = n;
                         }
@@ -398,7 +424,7 @@ pub fn Partition(comptime T: type) type {
                     self.swap(0, p);
                     return;
                 }
-                if (k + 1 == cur.len)
+                if (i + 1 == cur.len)
                 {
                     var p: usize = 0;
                     for (1..cur.len) |n| {
@@ -436,6 +462,68 @@ pub fn Partition(comptime T: type) type {
 }
 
 
+// Export functions for C library
+
+fn kth_element_generic(T: type, ptr: [*]T, len: usize, k: usize) void {
+    var slice: []T = undefined;
+    slice.ptr = ptr;
+    slice.len = len;
+    const x = Partition(T) { .items = slice };
+    x.kthElement(k);
+
+}
+
+
+pub export fn kth_element_char(ptr: [*]c_char, len: usize, k: usize) callconv(.C) void {
+    return kth_element_generic(c_char, ptr, len, k);
+}
+
+pub export fn kth_element_short(ptr: [*]c_short, len: usize, k: usize) callconv(.C) void {
+    return kth_element_generic(c_short, ptr, len, k);
+}
+
+pub export fn kth_element_int(ptr: [*]c_int, len: usize, k: usize) callconv(.C) void {
+    return kth_element_generic(c_int, ptr, len, k);
+}
+
+pub export fn kth_element_long(ptr: [*]c_long, len: usize, k: usize) callconv(.C) void {
+    return kth_element_generic(c_long, ptr, len, k);
+}
+
+pub export fn kth_element_longlong(ptr: [*]c_longlong, len: usize, k: usize) callconv(.C) void {
+    return kth_element_generic(c_longlong, ptr, len, k);
+}
+
+pub export fn kth_element_uint(ptr: [*]c_uint, len: usize, k: usize) callconv(.C) void {
+    return kth_element_generic(c_uint, ptr, len, k);
+}
+
+pub export fn kth_element_ushort(ptr: [*]c_ushort, len: usize, k: usize) callconv(.C) void {
+    return kth_element_generic(c_ushort, ptr, len, k);
+}
+
+pub export fn kth_element_ulong(ptr: [*]c_ulong, len: usize, k: usize) callconv(.C) void {
+    return kth_element_generic(c_ulong, ptr, len, k);
+}
+
+pub export fn kth_element_ulonglong(ptr: [*]c_ulonglong, len: usize, k: usize) callconv(.C) void {
+    return kth_element_generic(c_ulonglong, ptr, len, k);
+}
+
+pub export fn kth_element_float(ptr: [*]f32, len: usize, k: usize) callconv(.C) void {
+    return kth_element_generic(f32, ptr, len, k);
+}
+
+pub export fn kth_element_double(ptr: [*]f64, len: usize, k: usize) callconv(.C) void {
+    return kth_element_generic(f64, ptr, len, k);
+}
+
+pub export fn kth_element_longdouble(ptr: [*]c_longdouble, len: usize, k: usize) callconv(.C) void {
+    return kth_element_generic(c_longdouble, ptr, len, k);
+}
+
+
+
 
 test "baseline" {
     // 1, 2, 2, 3, 4, 4, 5, 5, 6, 7, 9, 10, 11
@@ -444,27 +532,27 @@ test "baseline" {
     const x = Partition(usize){ .items = &data };
 
     var k = data.len / 2;
-    x.kElementMethod(.bfprt_baseline, k);
+    x.kthElementMethod(.bfprt_baseline, k);
     try std.testing.expect(data[k] == 5);
 
     k = 0;
-    x.kElementMethod(.bfprt_baseline, k);
+    x.kthElementMethod(.bfprt_baseline, k);
     try std.testing.expect(data[k] == 1);
 
     k = 1;
-    x.kElementMethod(.bfprt_baseline, k);
+    x.kthElementMethod(.bfprt_baseline, k);
     try std.testing.expect(data[k] == 2);
 
     k = 2;
-    x.kElementMethod(.bfprt_baseline, k);
+    x.kthElementMethod(.bfprt_baseline, k);
     try std.testing.expect(data[k] == 2);
 
     k = 3;
-    x.kElementMethod(.bfprt_baseline, k);
+    x.kthElementMethod(.bfprt_baseline, k);
     try std.testing.expect(data[k] == 3);
 
     k = data.len - 2;
-    x.kElementMethod(.bfprt_baseline, k);
+    x.kthElementMethod(.bfprt_baseline, k);
     try std.testing.expect(data[k] == 10);
 }
 
@@ -475,27 +563,27 @@ test "repeated step" {
     const x = Partition(usize){ .items = &data };
 
     var k = data.len / 2;
-    x.kElementMethod(.repeated_step, k);
+    x.kthElementMethod(.repeated_step, k);
     try std.testing.expect(data[k] == 5);
 
     k = 0;
-    x.kElementMethod(.repeated_step, k);
+    x.kthElementMethod(.repeated_step, k);
     try std.testing.expect(data[k] == 1);
 
     k = 1;
-    x.kElementMethod(.repeated_step, k);
+    x.kthElementMethod(.repeated_step, k);
     try std.testing.expect(data[k] == 2);
 
     k = 2;
-    x.kElementMethod(.repeated_step, k);
+    x.kthElementMethod(.repeated_step, k);
     try std.testing.expect(data[k] == 2);
 
     k = 3;
-    x.kElementMethod(.repeated_step, k);
+    x.kthElementMethod(.repeated_step, k);
     try std.testing.expect(data[k] == 3);
 
     k = data.len - 2;
-    x.kElementMethod(.repeated_step, k);
+    x.kthElementMethod(.repeated_step, k);
     try std.testing.expect(data[k] == 10);
 }
 
@@ -506,27 +594,27 @@ test "ninthers median" {
     const x = Partition(usize){ .items = &data };
 
     var k = data.len / 2;
-    x.kElementMethod(.median_of_ninthers, k);
+    x.kthElementMethod(.median_of_ninthers, k);
     try std.testing.expect(data[k] == 5);
 
     k = 0;
-    x.kElementMethod(.median_of_ninthers, k);
+    x.kthElementMethod(.median_of_ninthers, k);
     try std.testing.expect(data[k] == 1);
 
     k = 1;
-    x.kElementMethod(.median_of_ninthers, k);
+    x.kthElementMethod(.median_of_ninthers, k);
     try std.testing.expect(data[k] == 2);
 
     k = 2;
-    x.kElementMethod(.median_of_ninthers, k);
+    x.kthElementMethod(.median_of_ninthers, k);
     try std.testing.expect(data[k] == 2);
 
     k = 3;
-    x.kElementMethod(.median_of_ninthers, k);
+    x.kthElementMethod(.median_of_ninthers, k);
     try std.testing.expect(data[k] == 3);
 
     k = data.len - 2;
-    x.kElementMethod(.median_of_ninthers, k);
+    x.kthElementMethod(.median_of_ninthers, k);
     try std.testing.expect(data[k] == 10);
 }
 
@@ -543,7 +631,7 @@ test "rng data" {
 
     const x = Partition(usize){ .items = y };
     const k = y.len / 2;
-    x.kElementMethod(.median_of_ninthers, k);
+    x.kthElementMethod(.median_of_ninthers, k);
     try std.testing.expect(y[k] == 515);
 }
 
